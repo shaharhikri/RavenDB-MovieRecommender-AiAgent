@@ -61,35 +61,38 @@ namespace MoviesDatabaseChat
         private static async Task AddRatingsAndUsersAsync(IDocumentStore store, Action<string> log)
         {
             log("Ratings");
-
-            using var reader = new StreamReader(Path.Combine("Csvs", "ratings.csv"));
-            using var csv = new CsvHelper.CsvReader(reader, CultureInfo.InvariantCulture);
-
+            var usersToCreate = new Dictionary<string, HashSet<string>>();
             int count = 0;
 
-            var usersToCreate = new Dictionary<string, HashSet<string>>();
-
-            using (var bulkInsert = store.BulkInsert())
+            for (int i = 1; i <= 10; i++)
             {
-                foreach (var row in csv.GetRecords<RatingCsvRow>())
+
+                using var reader = new StreamReader(Path.Combine("Csvs", $"ratings{i}.csv"));
+                using var csv = new CsvHelper.CsvReader(reader, CultureInfo.InvariantCulture);
+
+                using (var bulkInsert = store.BulkInsert())
                 {
-                    var rating = row.ToRating();
-                    if (rating == null)
-                        continue;
-
-                    if (usersToCreate.TryGetValue(rating.UserId, out var moviesList) == false || moviesList == null)
-                        usersToCreate[rating.UserId] = new HashSet<string>();
-
-                    usersToCreate[rating.UserId].Add(rating.MovieId);
-
-                    await bulkInsert.StoreAsync(rating);
-                    count++;
-
-                    if (count % 500_000 == 0)
+                    foreach (var row in csv.GetRecords<RatingCsvRow>())
                     {
-                        log($"Saved {count} ratings...");
+                        var rating = row.ToRating();
+                        if (rating == null)
+                            continue;
+
+                        if (usersToCreate.TryGetValue(rating.UserId, out var moviesList) == false || moviesList == null)
+                            usersToCreate[rating.UserId] = new HashSet<string>();
+
+                        usersToCreate[rating.UserId].Add(rating.MovieId);
+
+                        await bulkInsert.StoreAsync(rating);
+                        count++;
+
+                        if (count % 500_000 == 0)
+                        {
+                            log($"Saved {count} ratings...");
+                        }
                     }
                 }
+
             }
 
             log($"Done! Total saved: {count}");
