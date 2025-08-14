@@ -29,7 +29,7 @@ built with **RavenDB's AI Agent feature** and **.NET Core**.
    - [Download RavenDB](https://ravendb.net/download) if you don't have it installed.
 
 2. **OpenAI API Key**
-   - Set your OpenAI API key as an environment variable: ```RAVEN_AI_INTEGRATION_OPENAI_API_KEY "your_api_key_here```
+   - Set your OpenAI API key as an environment variable: ```RAVEN_AI_INTEGRATION_OPENAI_API_KEY```
 
 ---
 

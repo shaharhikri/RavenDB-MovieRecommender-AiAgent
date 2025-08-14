@@ -1,0 +1,19 @@
+    // **Sample conversation:**
+    // What's my name?
+    // How many movies have I watched?
+    // What's the top 5 movies on my watch list based on my ratings?
+    // I want the next 5 best movies
+    // I want the top 10 movies on my watch list based on my ratings
+    // What's the top 5 movies on my list based on everyone’s ratings?
+    // What are the movies you suggested to me in the last answer?
+    // Can you give me the description of the first movie?
+    // Find the top 5 most-viewed movies whose titles contain the word 'Avengers'
+
+    // Find me the top 5 thrilling and exciting movies that suit my taste
+
+    // Find me the top 5 most-viewed movies whose tags contain the word 'cyber'
+
+    // I want to rate the movie toy story with a rating of 7
+    // I want to rate the movie toy story with a rating of 4.789
+    // I want to add the tags "cool" and "impressive" to the movie "toy story"
+    // I want to change my name to "Shahar Hikri"
