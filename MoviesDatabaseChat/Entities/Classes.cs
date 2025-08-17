@@ -51,9 +51,9 @@
         public List<string> MoviesNames { get; set; }
     }
 
-    public class RateToolSampleObject
+    public class RateToolSampleRequest
     {
-        public static RateToolSampleObject Instance = new()
+        public static RateToolSampleRequest Instance = new()
         {
             MovieName = "The name of the movie the user wants to rate",
             RateValue = 4.5
@@ -63,9 +63,9 @@
         public double RateValue { get; set; }
     }
 
-    public class AddTagSampleObject
+    public class AddTagsSampleRequest
     {
-        public static AddTagSampleObject Instance = new()
+        public static AddTagsSampleRequest Instance = new()
         {
             MovieName = "The name of the movie the user wants to rate",
             Tags = [ "Scary", "Disgusting" ]
@@ -75,9 +75,9 @@
         public HashSet<string> Tags { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
-    public class ChangeUserNameObject
+    public class ChangeUserNameSampleRequest
     {
-        public static ChangeUserNameObject Instance = new()
+        public static ChangeUserNameSampleRequest Instance = new()
         {
             OldUserName = "James Parker",
             NewUserName = "James Smith"
@@ -91,6 +91,6 @@
     public class ActionToolResult
     {
         public bool IsSuccessful { get; set; }
-        public string FailureReason { get; set; }
+        public string Answer { get; set; }
     }
 }

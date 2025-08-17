@@ -12,7 +12,7 @@ class Program
             Database = "MoviesDB2"
         }.Initialize();
 
-        if (await DatabaseBootstrapper.CreateDatabaseAsync(store, log: Console.WriteLine))
+        if (await DatabaseBootstrapper.CreateDatabaseAsync(store, log: Console.WriteLine, smallDb: true))
         {
             Console.WriteLine($"Database '{store.Database}' is ready on your local server, run again for chat");
             return;
@@ -105,10 +105,10 @@ class Program
         Console.WriteLine($"Answer: {movie.Answer}");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         if (movie.MoviesIds.Count > 0)
-            Console.WriteLine($"\nMovies ids: [{string.Join(", ", movie.MoviesIds)}]");
+            Console.WriteLine($"Movies ids: [{string.Join(", ", movie.MoviesIds)}]");
 
         if (movie.MoviesNames.Count > 0)
-            Console.WriteLine($"\nMovies names: [{string.Join(", ", movie.MoviesNames)}]");
+            Console.WriteLine($"Movies names: [{string.Join(", ", movie.MoviesNames)}]");
         Console.ForegroundColor = ConsoleColor.White;
     }
 

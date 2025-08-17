@@ -18,79 +18,34 @@ namespace MoviesDatabaseChat
             _userId = userId;
             _chat = store.AI.Conversation(DatabaseBootstrapper.AiAgentIdentifier, chatId,
                 creationOptions: new AiConversationCreationOptions().AddParameter("userId", userId));
+
+            _chat.Handle<RateToolSampleRequest>("RateMovie", (r) => RateMovieAsync(store, userId, r));
+            _chat.Handle<AddTagsSampleRequest>("AddTags", (r) => AddTagsAsync(store, r));
+            _chat.Handle<ChangeUserNameSampleRequest>("ChangeUserName", (r) => ChangeUserNameAsync(store, userId, r));
         }
 
         public async Task<MoviesSampleObject> TalkAsync(string prompt)
         {
             _chat.SetUserPrompt(prompt);
-
             var agentResult = await _chat.RunAsync<MoviesSampleObject>(CancellationToken.None);
 
-            return await HandleActionToolRequestsAsync(_store, _chat, _userId, agentResult);
-        }
-
-        private static async Task<MoviesSampleObject> HandleActionToolRequestsAsync(IDocumentStore store,
-            IAiConversationOperations chat, string userId, AiAnswer<MoviesSampleObject> agentResult)
-        {
             while (agentResult.Status == AiConversationResult.ActionRequired)
             {
-                foreach (var request in chat.RequiredActions())
-                {
-                    await HandleSingleActionRequest(store, chat, userId, request);
-                }
-
-                agentResult = await chat.RunAsync<MoviesSampleObject>(CancellationToken.None);
+                agentResult = await _chat.RunAsync<MoviesSampleObject>(CancellationToken.None);
             }
 
             return agentResult.Answer;
         }
 
-        private static async Task HandleSingleActionRequest(IDocumentStore store, IAiConversationOperations chat, string userId, AiAgentActionRequest request)
+        private static async Task<object> RateMovieAsync(IDocumentStore store, string userId, RateToolSampleRequest req)
         {
-            try
-            {
-                switch (request.Name)
-                {
-                    case "RateMovie":
-                        await RateMovieAsync(store, chat, userId, request);
-                        break;
-                    case "AddTags":
-                        await AddTagsAsync(store, chat, userId, request);
-                        break;
-                    case "ChangeUserName":
-                        await ChangeUserNameAsync(store, chat, userId, request);
-                        break;
-                    default:
-                        chat.AddActionResponse(request.ToolId, new ActionToolResult
-                        {
-                            IsSuccessful = false,
-                            FailureReason = $"Tool '{request.Name}' is Unrecognized"
-                        });
-                        break;
-                }
-            }
-            catch (Exception e)
-            {
-                chat.AddActionResponse(request.ToolId, new ActionToolResult
-                {
-                    IsSuccessful = false,
-                    FailureReason = "database error (server error 500): " + e.Message.Substring(0, 100)
-                });
-            }
-        }
-
-        private static async Task RateMovieAsync(IDocumentStore store, IAiConversationOperations chat, string userId,
-            AiAgentActionRequest request)
-        {
-            var req = JsonSerializer.Deserialize<RateToolSampleObject>(request.Arguments);
             if (req.RateValue < 0 || req.RateValue > 5)
             {
-                chat.AddActionResponse(request.ToolId, new ActionToolResult
+                return new ActionToolResult
                 {
                     IsSuccessful = false,
-                    FailureReason = $"Cant rate \"{req.MovieName}\" with the rate value {req.RateValue} - rate value has to be between 0 to 5"
-                });
-                return;
+                    Answer = $"Cant rate \"{req.MovieName}\" with the rate value {req.RateValue} - rate value has to be between 0 to 5"
+                };
             }
 
             using (var session = store.OpenAsyncSession())
@@ -103,12 +58,11 @@ namespace MoviesDatabaseChat
 
                 if (movies == null || movies.Count == 0)
                 {
-                    chat.AddActionResponse(request.ToolId, new ActionToolResult
+                    return new ActionToolResult
                     {
                         IsSuccessful = false,
-                        FailureReason = $"Movie with the name \"{req.MovieName}\" doesn't exist on the database"
-                    });
-                    return;
+                        Answer = $"Movie with the name \"{req.MovieName}\" doesn't exist on the database"
+                    };
                 }
 
                 var user = await session.LoadAsync<User>(userId);
@@ -128,20 +82,17 @@ namespace MoviesDatabaseChat
 
                 await session.SaveChangesAsync();
 
-                chat.AddActionResponse(request.ToolId, new ActionToolResult
+                return new ActionToolResult
                 {
                     IsSuccessful = true,
-                    FailureReason =
+                    Answer =
                         $"Found {movies.Count} movies with the name '{req.MovieName}' and rated them by score '{req.RateValue}'"
-                });
+                };
             }
         }
 
-        private static async Task AddTagsAsync(IDocumentStore store, IAiConversationOperations chat, string userId,
-            AiAgentActionRequest request)
+        private static async Task<object> AddTagsAsync(IDocumentStore store, AddTagsSampleRequest req)
         {
-
-            var req = JsonSerializer.Deserialize<AddTagSampleObject>(request.Arguments);
             using (var session = store.OpenAsyncSession())
             {
                 var movies = await session
@@ -152,13 +103,12 @@ namespace MoviesDatabaseChat
 
                 if (movies == null || movies.Count == 0)
                 {
-                    chat.AddActionResponse(request.ToolId, new ActionToolResult
+                    return new ActionToolResult
                     {
                         IsSuccessful = false,
-                        FailureReason =
+                        Answer =
                             $"Movie with the name \"{req.MovieName}\" doesn't exist on the database"
-                    });
-                    return;
+                    };
                 }
 
                 foreach (var m in movies)
@@ -171,40 +121,37 @@ namespace MoviesDatabaseChat
 
                 await session.SaveChangesAsync();
 
-                chat.AddActionResponse(request.ToolId, new ActionToolResult
+                return new ActionToolResult 
                 {
                     IsSuccessful = true,
-                    FailureReason =
+                    Answer =
                         $"Found {movies.Count} movies with the name '{req.MovieName}' and added them by tags [{string.Join(", ", req.Tags)}]"
-                });
+                };
             }
         }
 
-        private static async Task ChangeUserNameAsync(IDocumentStore store, IAiConversationOperations chat,
-            string userId, AiAgentActionRequest request)
+        private static async Task<object> ChangeUserNameAsync(IDocumentStore store, string userId, ChangeUserNameSampleRequest req)
         {
-            var req = JsonSerializer.Deserialize<ChangeUserNameObject>(request.Arguments);
             using (var session = store.OpenAsyncSession())
             {
                 var user = await session.LoadAsync<User>(userId);
                 if (user.Name.ToLower() != req.OldUserName.ToLower())
                 {
-                    chat.AddActionResponse(request.ToolId, new ActionToolResult
+                    return new ActionToolResult
                     {
                         IsSuccessful = false,
-                        FailureReason = $"Your old name isn't '{req.OldUserName}'"
-                    });
-                    return;
+                        Answer = $"Your old name isn't '{req.OldUserName}'"
+                    };
                 }
 
                 user.Name = req.NewUserName;
                 await session.SaveChangesAsync();
 
-                chat.AddActionResponse(request.ToolId, new ActionToolResult
+                return new ActionToolResult
                 {
                     IsSuccessful = true,
-                    FailureReason = $"Name of user '{user.Id}' changed from '{req.OldUserName}' to '{req.NewUserName}'"
-                });
+                    Answer = $"Name of user '{user.Id}' changed from '{req.OldUserName}' to '{req.NewUserName}'"
+                };
             }
         }
     }

@@ -18,7 +18,7 @@ namespace MoviesDatabaseChat
     {
         public const string AiAgentIdentifier = "movie-recommender";
 
-        public static async Task<bool> CreateDatabaseAsync(IDocumentStore store, Action<string> log)
+        public static async Task<bool> CreateDatabaseAsync(IDocumentStore store, Action<string> log, bool smallDb)
         {
             if (await DatabaseExistsAsync(store, store.Database)) // db exists -> don't create it again
                 return false;
@@ -30,19 +30,20 @@ namespace MoviesDatabaseChat
             log("Initialize Movies Database:");
             
             await AddMoviesAsync(store, log);
-            await AddRatingsAndUsersAsync(store, log);
+            await AddRatingsAndUsersAsync(store, log, smallDb);
             await AddTagsAsync(store, log);
             
             log("Creating Indexes");
             await new Ratings_ByMovie_Stats().ExecuteAsync(store);
             await new Ratings_ByUser_LastRates().ExecuteAsync(store);
-            await new UserTagAffinity().ExecuteAsync(store);
+            if (smallDb == false)
+                await new UserTagAffinity().ExecuteAsync(store);
             await new UserGenreAffinity().ExecuteAsync(store);
             await new MovieStats_ByVector_GenresTags_AndAverageRating_AndViews().ExecuteAsync(store);
             await new Ratings_ByUser_And_Movie().ExecuteAsync(store);
             await new MovieStats_ByGenres_Title_Tags_AverageRating_AndViews().ExecuteAsync(store);
 
-            await ConfigAiAgentAsync(store, log);
+            await ConfigAiAgentAsync(store, log, smallDb);
 
             log("Finished initializing the database!");
 
@@ -58,7 +59,7 @@ namespace MoviesDatabaseChat
 
         // add docs funcs
 
-        private static async Task AddRatingsAndUsersAsync(IDocumentStore store, Action<string> log)
+        private static async Task AddRatingsAndUsersAsync(IDocumentStore store, Action<string> log, bool smallDb)
         {
             log("Ratings");
             var usersToCreate = new Dictionary<string, HashSet<string>>();
@@ -90,8 +91,13 @@ namespace MoviesDatabaseChat
                         {
                             log($"Saved {count} ratings...");
                         }
+
+                        if (smallDb && count >= 1_500_000)
+                            break;
                     }
                 }
+                if (smallDb && count >= 1_500_000)
+                    break;
 
             }
 
@@ -198,7 +204,7 @@ namespace MoviesDatabaseChat
 
         // create agent
 
-        public static async Task ConfigAiAgentAsync(IDocumentStore store, Action<string> log)
+        public static async Task ConfigAiAgentAsync(IDocumentStore store, Action<string> log, bool smallDb)
         {
             log("Creating Ai Agent");
 
@@ -230,18 +236,6 @@ namespace MoviesDatabaseChat
                             "where UserId == $userId " +
                             "select LastRates",
                     ParametersSampleObject = "{}"
-                },
-                new AiAgentToolQuery
-                {
-                    Name = "GetUserAffinitiesByTags",
-                    Description =
-                        "Get user tag affinities sorted by score, ordered by average Score (rating) - descending\"",
-                    Query = "from index 'UserTagAffinity' " +
-                            "where UserId = $userId " +
-                            "order by Score desc " +
-                            "select Tag, Score, Count " +
-                            "limit $skip, $pageSize",
-                    ParametersSampleObject = "{\"skip\": 0, \"pageSize\": 10}"
                 },
                 new AiAgentToolQuery
                 {
@@ -659,22 +653,38 @@ namespace MoviesDatabaseChat
                 }
             };
 
+            if (smallDb == false)
+            {
+                queryTools.Add(new AiAgentToolQuery
+                {
+                    Name = "GetUserAffinitiesByTags",
+                    Description =
+                        "Get user tag affinities sorted by score, ordered by average Score (rating) - descending\"",
+                    Query = "from index 'UserTagAffinity' " +
+                            "where UserId = $userId " +
+                            "order by Score desc " +
+                            "select Tag, Score, Count " +
+                            "limit $skip, $pageSize",
+                    ParametersSampleObject = "{\"skip\": 0, \"pageSize\": 10}"
+                });
+            }
+
             var actionTools = new List<AiAgentToolAction>()
             {
                 new AiAgentToolAction("RateMovie",
                     "Add movie rate for the current user you talking with, required movie name and rate value between 0 to 5 (can be double, doesn't has to be integer)")
                 {
-                    ParametersSampleObject = JsonConvert.SerializeObject(RateToolSampleObject.Instance)
+                    ParametersSampleObject = JsonConvert.SerializeObject(RateToolSampleRequest.Instance)
                 },
                 new AiAgentToolAction("AddTags",
                     "Adds one or more user-provided tags to a specified movie. Tags should describe the movie’s characteristics, such as themes, style, or content. Only perform this action if the tags are relevant to the movie; otherwise, do not apply them and inform the user that the tags are not suitable.")
                 {
-                    ParametersSampleObject = JsonConvert.SerializeObject(AddTagSampleObject.Instance)
+                    ParametersSampleObject = JsonConvert.SerializeObject(AddTagsSampleRequest.Instance)
                 },
                 new AiAgentToolAction("ChangeUserName",
                     "Updates the name of the current user interacting with the AI agent. have to send also the old name for validation.")
                 {
-                    ParametersSampleObject = JsonConvert.SerializeObject(ChangeUserNameObject.Instance)
+                    ParametersSampleObject = JsonConvert.SerializeObject(ChangeUserNameSampleRequest.Instance)
                 },
             };
 
